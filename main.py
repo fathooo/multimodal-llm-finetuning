@@ -1,19 +1,19 @@
 # Google Colab
 # Para ejecutar esto en Google Colab, asegúrate de que estás utilizando un entorno con soporte de GPU.
 # Instalar librerías necesarias
-# !pip install --upgrade torch torchvision transformers datasets pillow requests huggingface_hub
+#!pip install --upgrade torch torchvision transformers datasets pillow requests huggingface_hub
 
 # Importar las librerías necesarias
 import torch
+from torch.utils.data import DataLoader, Dataset
 from transformers import ChameleonProcessor, ChameleonForConditionalGeneration
 from PIL import Image
 import pandas as pd
 import requests
 from huggingface_hub import login
-from torch.utils.data import DataLoader, Dataset
 
 # Constantes
-TOKEN_HUGGINGFACE = "wed_pasdGsaazcwrjas34IvHOUHNtRasdasda"
+TOKEN_HUGGINGFACE = "wed_pasdGsaazcwrjas34IvHOUHNtRasdasda"  # Reemplazar con tu token
 
 # Iniciar sesión en Hugging Face
 login(TOKEN_HUGGINGFACE)
@@ -27,9 +27,16 @@ model = ChameleonForConditionalGeneration.from_pretrained(model_name, torch_dtyp
 ## Función para descargar y procesar imágenes y texto
 def process_data(row):
     response = requests.get(row['image_url'], stream=True)
-    image = Image.open(response.raw)
-    inputs = processor(row["text"] + "<image>", images=image, return_tensors="pt").to(model.device, dtype=torch.bfloat16)
+    image = Image.open(response.raw).convert("RGB")
+    inputs = processor(text=row["text"] + " <image>", images=image, return_tensors="pt", padding=True).to(model.device, dtype=torch.bfloat16)
     return inputs
+    
+def process_data_with_padding(row, processor, model):
+    response = requests.get(row['image_url'], stream=True)
+    image = Image.open(response.raw).convert("RGB")
+    inputs = processor(text=row["text"] + " <image>", images=image, return_tensors="pt", padding=True)
+    inputs = {k: v.to(model.device) for k, v in inputs.items()}
+    return input
 
 # Creación de un mock dataset
 data = {
@@ -62,23 +69,23 @@ sample_data = process_data(df.iloc[0])
 print(sample_data)
 
 
-
-
+# Crear DataLoader
 class CustomDataset(Dataset):
-    def __init__(self, dataframe):
+    def __init__(self, dataframe, processor, model):
         self.data = dataframe
+        self.processor = processor
+        self.model = model
 
     def __len__(self):
         return len(self.data)
 
     def __getitem__(self, idx):
-        return process_data(self.data.iloc[idx])
+        return process_data_with_padding(self.data.iloc[idx], self.processor, self.model)
 
 # Crear DataLoader
-train_dataset = CustomDataset(df)
+train_dataset = CustomDataset(df, processor, model)
 train_dataloader = DataLoader(train_dataset, batch_size=2, shuffle=True)
 
-#%%
 # Entrenamiento
 optimizer = torch.optim.AdamW(model.parameters(), lr=5e-5)
 
@@ -93,9 +100,20 @@ for epoch in range(3):  # Número de épocas de ejemplo
         loss.backward()
         optimizer.step()
 
-
-#%%
 # Guardar el modelo entrenado
 model.save_pretrained("./save-finetuned-model")
 processor.save_pretrained("./save-finetuned-processor")
 
+###
+# Cargar el modelo guardado para inferencia
+model = ChameleonForConditionalGeneration.from_pretrained("./save-finetuned-model", torch_dtype=torch.bfloat16, device_map="cuda")
+processor = ChameleonProcessor.from_pretrained("./save-finetuned-processor")
+
+#%%
+# Probar la inferencia
+test_prompt = "Describe la imagen:<image>"
+test_image_url = "https://images.unsplash.com/photo-1551963831-b3b1ca40c98e"
+test_image = Image.open(requests.get(test_image_url, stream=True).raw)
+test_inputs = processor(test_prompt, images=test_image, return_tensors="pt").to(model.device, dtype=torch.bfloat16)
+output = model.generate(**test_inputs, max_new_tokens=50)
+print(processor.decode(output[0], skip_special_tokens=True))
