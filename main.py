@@ -5,7 +5,7 @@ from transformers import ChameleonProcessor, ChameleonForConditionalGeneration
 from app.config.config import TOKEN_HUGGINGFACE, MODEL_NAME, get_device, print_device_info, LEARNING_RATE, MAX_STEPS_PER_EPOCH, EPOCHS
 from app.data.dataset import CustomDataset
 from app.utils import hf_login
-from app.repository.useCases.train import train_model
+from app.services.train import train_model
 import torch
 
 print_device_info()
