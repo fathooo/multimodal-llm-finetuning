@@ -5,3 +5,4 @@ import os
 load_dotenv()
 
 ENV_TOKEN_HUGGINGFACE = os.getenv('TOKEN_HUGGINGFACE', "https://huggingface.co/token/#here")
+ENV_DOWNLOAD_DATA_DIR = os.getenv('DOWNLOAD_DATA_DIR', "app/datasets")
