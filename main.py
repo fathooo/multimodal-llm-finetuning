@@ -7,6 +7,7 @@ from app.data.dataset import CustomDataset
 from app.utils import hf_login
 from app.services.train import train_model
 from datasets import load_dataset, DatasetDict
+from torch.utils.data import DataLoader
 import torch
 
 print_device_info()
@@ -41,44 +42,77 @@ def tokenize_function(examples):
         instruction + " " + input_text + " " + output_text
         for instruction, input_text, output_text in zip(examples["instruction"], examples["input"], examples["output"])
     ]
-    # Tokenizar el texto y usar los input_ids como etiquetas, ojo con el max_length que pueden quedarse datos fuera
-    tokenized_inputs = processor(concatenated_texts, padding="max_length", truncation=True, max_length=256)
+    # Tokenizar el texto y usar los input_ids como etiquetas
+    tokenized_inputs = processor(concatenated_texts, padding="max_length", truncation=True, max_length=64)
     tokenized_inputs["labels"] = tokenized_inputs["input_ids"].clone()  # Usar clone() en lugar de copy()
     return tokenized_inputs
 
 # Tokenizar el dataset dividido (no el original)
-# split_datasets = tokenized_datasets["train"].train_test_split(test_size=0.5)
 tokenized_datasets = tokenized_datasets.map(tokenize_function, batched=True)
 print(tokenized_datasets)
+
+# Cargar los datos con DataLoader y collate_fn para manejar el batching
+selected_indices = list(range(1))  # Seleccionar los índices del 0 al 9
+train_loader = DataLoader(tokenized_datasets["train"].select(selected_indices), batch_size=1, shuffle=True)
 #%%
 
-#%%
-# 4. Configurar los argumentos de entrenamiento
-training_args = TrainingArguments(
-    output_dir="./results",              # Directorio donde se guardarán los resultados
-    evaluation_strategy="epoch",        # Evaluación al final de cada época
-    learning_rate=2e-5,                 # Tasa de aprendizaje
-    per_device_train_batch_size=1,      # Tamaño del lote para entrenamiento
-    per_device_eval_batch_size=1,       # Tamaño del lote para evaluación
-    num_train_epochs=2,                 # Número de épocas de entrenamiento
-    weight_decay=0.01,                  # Tasa de decaimiento del peso
-    fp16=False,                          # Usar FP16
-)
-
-# 5. Inicializar el Trainer
-trainer = Trainer(
-    model=model,                        # Modelo que vamos a entrenar
-    args=training_args,                 # Argumentos de entrenamiento
-    train_dataset=tokenized_datasets["train"],  # Dataset de entrenamiento tokenizado
-    eval_dataset=tokenized_datasets["test"],    # Dataset de evaluación tokenizado
-)
-#%%
 
 #%%
+optimizer = torch.optim.AdamW(model.parameters(), lr=2e-5)
+accumulation_steps = 4  # Número de pasos para acumular gradientes
+model.gradient_checkpointing_enable()  # Activar gradient checkpointing
+
 # 6. Entrenar el modelo
-torch.cuda.empty_cache()
-trainer.train()
-#%%
+model.train()
+for epoch in range(5):
+    for i, batch in enumerate(train_loader):
+        print(batch)  # Imprime la estructura del batch
+        # Convertir listas de tensores en un solo tensor y mover a GPU
+        # Verifica que los tensores tengan las dimensiones correctas
+        input_ids = torch.stack(batch["input_ids"]).to(device)
+        attention_mask = torch.stack(batch["attention_mask"]).to(device)
+        labels = torch.stack(batch["labels"]).to(device)
 
+        # Verifica dimensiones de los tensores
+        if input_ids.dim() == 1:
+            input_ids = input_ids.unsqueeze(0)
+        if attention_mask.dim() == 1:
+            attention_mask = attention_mask.unsqueeze(0)
+        if labels.dim() == 1:
+            labels = labels.unsqueeze(0)
+
+        batch = {
+            "input_ids": input_ids,
+            "attention_mask": attention_mask,
+            "labels": labels
+        }        
+
+        optimizer.zero_grad()  # Resetear los gradientes antes de cada paso de optimización
+        outputs = model(**batch)  # Hacer la predicción
+        print(outputs)  # Imprimir los resultados
+        loss = outputs.loss  # Calcular la pérdida
+        loss.backward()  # Propagar los gradientes
+        print(f"Loss: {loss}")
+
+        if (true): #(i + 1) % accumulation_steps == 0:  # Actualizar cada n pasos
+            print(f"Step {i + 1} - Updating parameters")
+            with torch.no_grad():
+                optimizer.step()  # Actualizar los parámetros del modelo
+            optimizer.zero_grad()  # Resetear los gradientes
+            torch.cuda.empty_cache()  # Liberar memoria
+        
+        # Imprimir la pérdida para monitorear el entrenamiento
+        print(f"Loss: {loss.item()}")
+        
+        # Opcional: liberar memoria no utilizada en GPU
+        torch.cuda.empty_cache()
+
+#%%
+test_prompt = "Como estas Felipe, que tal tus vacaciones en la playa?"
+test_inputs = processor(test_prompt, return_tensors="pt").to(model.device, dtype=torch.bfloat16)
+output = model.generate(**test_inputs, max_new_tokens=50)
+print(processor.decode(output[0], skip_special_tokens=True))
+#%%
 # 7. Guardar el modelo fine-tuned
 model.save_pretrained("./fine_tuned_chameleon")
+#%%
