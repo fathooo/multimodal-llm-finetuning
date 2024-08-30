@@ -1,5 +1,4 @@
 #%%
-
 import pandas as pd
 from transformers import Trainer, TrainingArguments, ChameleonProcessor, ChameleonForConditionalGeneration
 from app.config.config import TOKEN_HUGGINGFACE, MODEL_NAME, get_device, print_device_info, LEARNING_RATE, MAX_STEPS_PER_EPOCH, EPOCHS
@@ -43,7 +42,7 @@ def tokenize_function(examples):
         for instruction, input_text, output_text in zip(examples["instruction"], examples["input"], examples["output"])
     ]
     # Tokenizar el texto y usar los input_ids como etiquetas
-    tokenized_inputs = processor(concatenated_texts, padding="max_length", truncation=True, max_length=64)
+    tokenized_inputs = processor(concatenated_texts, padding="max_length", truncation=True, max_length=1)
     tokenized_inputs["labels"] = tokenized_inputs["input_ids"].clone()  # Usar clone() en lugar de copy()
     return tokenized_inputs
 
@@ -69,9 +68,9 @@ for epoch in range(5):
         print(batch)  # Imprime la estructura del batch
         # Convertir listas de tensores en un solo tensor y mover a GPU
         # Verifica que los tensores tengan las dimensiones correctas
-        input_ids = torch.stack(batch["input_ids"]).to(device)
-        attention_mask = torch.stack(batch["attention_mask"]).to(device)
-        labels = torch.stack(batch["labels"]).to(device)
+        input_ids = torch.stack(batch["input_ids"]).to(device).permute(1, 0)
+        attention_mask = torch.stack(batch["attention_mask"]).to(device).permute(1, 0)
+        labels = torch.stack(batch["labels"]).to(device).permute(1, 0)
 
         # Verifica dimensiones de los tensores
         if input_ids.dim() == 1:
@@ -94,7 +93,7 @@ for epoch in range(5):
         loss.backward()  # Propagar los gradientes
         print(f"Loss: {loss}")
 
-        if (true): #(i + 1) % accumulation_steps == 0:  # Actualizar cada n pasos
+        if(i>=8): #(i + 1) % accumulation_steps == 0:  # Actualizar cada n pasos
             print(f"Step {i + 1} - Updating parameters")
             with torch.no_grad():
                 optimizer.step()  # Actualizar los parámetros del modelo
