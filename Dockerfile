@@ -19,6 +19,10 @@ RUN pip3 install ninja cmake wheel
 
 # Add the setup.py to the directory if it's not there already
 COPY setup.py /triton_build/triton/
+COPY main.py /triton_build/triton
+
+RUN pip3 install python-dotenv colorama datasets accelerate
+RUN pip3 install liger-kernel pandas 
 
 # Build and install Triton
 RUN pip3 install .
