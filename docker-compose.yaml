@@ -7,8 +7,8 @@ services:
     volumes:
       - ./model_cache:/triton_build/triton/multimodal-llm-finetuning/fine_tuned_chameleon
       - ./app:/triton_build/triton/app  # Mapea la carpeta local "app" al directorio de trabajo en el contenedor
-      - ./main.py:/triton_build/triton/main.py  # Mapea el archivo local "main2.py" al archivo en el contenedor
-    command: python3 main.py  # Comando que ejecutará tu aplicación (puedes modificarlo según tus necesidades)
+      - ./main.py:/triton_build/triton/main.py  # Mapea el archivo local "main.py" al archivo en el contenedor
+    # command:   # Comando que ejecutará tu aplicación (puedes modificarlo según tus necesidades)
     environment:
       - NVIDIA_VISIBLE_DEVICES=all
       - NVIDIA_DRIVER_CAPABILITIES=compute,utility
