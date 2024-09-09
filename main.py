@@ -1,6 +1,6 @@
+#%%
 import pandas as pd
-from transformers import Trainer, TrainingArguments, ChameleonProcessor, ChameleonForConditionalGeneration
-from liger_kernel.transformers import AutoLigerKernelForCausalLM
+from transformers import Trainer, TrainingArguments, ChameleonProcessor, ChameleonForConditionalGeneration, AutoModel
 from app.config.config import TOKEN_HUGGINGFACE, MODEL_NAME, get_device, print_device_info, LEARNING_RATE, MAX_STEPS_PER_EPOCH, EPOCHS
 from app.data.dataset import CustomDataset
 from app.utils import hf_login
@@ -31,7 +31,7 @@ print(dataset)
 #%%
 # 2. Cargar el modelo Chameleon preentrenado y su procesador
 processor = ChameleonProcessor.from_pretrained(MODEL_NAME)
-model = AutoLigerKernelForCausalLM.from_pretrained("facebook/chameleon-7b").to(device)
+model = AutoModel.from_pretrained("facebook/chameleon-7b").to(device)
 # model = ChameleonForConditionalGeneration.from_pretrained(MODEL_NAME, torch_dtype=torch.bfloat16).to(device)
 #%%
 
