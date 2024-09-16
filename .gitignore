@@ -3,3 +3,4 @@ venv
 files/mock_data/*
 .env
 app/datasets/
+app/model_cache/
