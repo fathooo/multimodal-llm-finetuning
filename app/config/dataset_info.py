@@ -6,3 +6,12 @@ dataset_info_list = [
         'format': 'parquet'
     },
 ]
+
+# Dataset information
+dataset_evals_list = [
+    {
+        'url': 'https://huggingface.co/datasets/openai/MMMLU/resolve/main/test/mmlu_ES-LA.csv',
+        'file_name': 'mmlu_ES-LA.csv',
+        'format': 'csv'
+    },
+]
