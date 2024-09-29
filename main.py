@@ -1,5 +1,6 @@
 #%%
 import pandas as pd
+from flash_attn import flash_attn_qkvpacked_func
 from transformers import Trainer, TrainingArguments, ChameleonProcessor, ChameleonForConditionalGeneration, AutoModel
 from app.config.config import TOKEN_HUGGINGFACE, MODEL_NAME, get_device, print_device_info, LEARNING_RATE, MAX_STEPS_PER_EPOCH, EPOCHS
 from app.data.dataset import CustomDataset
@@ -29,10 +30,22 @@ print(dataset)
 #%%
 
 #%%
+class FlashAttention(torch.nn.Module):
+    def __init__(self, model):
+        super().__init__()
+        self.model = model
+
+    def forward(self, input_ids, attention_mask=None):
+        q, k, v = self.model.get_qkv(input_ids)
+        return flash_attn_qkvpacked_func(q, k, v)
+#%%
+
+#%%
 # 2. Cargar el modelo Chameleon preentrenado y su procesador
 processor = ChameleonProcessor.from_pretrained(MODEL_NAME)
-model = AutoModel.from_pretrained("facebook/chameleon-7b").to(device)
-# model = ChameleonForConditionalGeneration.from_pretrained(MODEL_NAME, torch_dtype=torch.bfloat16).to(device)
+model = ChameleonForConditionalGeneration.from_pretrained(MODEL_NAME, torch_dtype=torch.bfloat16).to(device)
+model_with_flash_attention = FlashAttention(model)
+model_with_flash_attention.gradient_checkpointing_enable()
 #%%
 
 #%%
@@ -56,11 +69,10 @@ selected_indices = list(range(1))  # Seleccionar los índices del 0 al 9
 train_loader = DataLoader(tokenized_datasets["train"].select(selected_indices), batch_size=1, shuffle=True)
 #%%
 
-
 #%%
 optimizer = torch.optim.AdamW(model.parameters(), lr=2e-5)
-accumulation_steps = 4  # Número de pasos para acumular gradientes
 model.gradient_checkpointing_enable()  # Activar gradient checkpointing
+accumulation_steps = 8  # Número de pasos para acumular gradientes
 
 # 6. Entrenar el modelo
 model.train()
@@ -88,7 +100,7 @@ for epoch in range(5):
         }        
 
         optimizer.zero_grad()  # Resetear los gradientes antes de cada paso de optimización
-        outputs = model(**batch)  # Hacer la predicción
+        outputs = model_with_flash_attention(input_ids=input_ids, attention_mask=attention_mask, labels=labels)        
         print(outputs)  # Imprimir los resultados
         loss = outputs.loss  # Calcular la pérdida
         loss.backward()  # Propagar los gradientes
