@@ -2,3 +2,6 @@ __pycache__
 venv
 files/mock_data/*
 .env
+app/datasets/
+app/datasets_eval/
+app/model_cache/

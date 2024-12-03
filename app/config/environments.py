@@ -4,5 +4,6 @@ import os
 # Carga las variables de entorno desde el archivo .env
 load_dotenv()
 
-TOKEN_HUGGINGFACE = os.getenv('TOKEN_HUGGINGFACE', "https://huggingface.co/token/#here")
-MOCK_DATA_FOLDER = os.getenv('MOCK_DATA_FOLDER', "files/mock_data")
+ENV_TOKEN_HUGGINGFACE = os.getenv('TOKEN_HUGGINGFACE', "https://huggingface.co/token/#here")
+ENV_DOWNLOAD_DATA_DIR = os.getenv('DOWNLOAD_DATA_DIR', "app/datasets")
+ENV_DOWNLOAD_DATA_EVAL_DIR = os.getenv('DOWNLOAD_DATA_EVAL_DIR', "app/datasets_eval")
